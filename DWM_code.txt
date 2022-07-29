@@ -1,0 +1,65 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from mlxtend.frequent_patterns import apriori
+from mlxtend.frequent_patterns import association_rules
+import category_encoders as ce
+!pip3 install category_encoders
+
+data = pd.read_csv('lastfm.csv')
+data = data.head(1000)
+
+print("The shape of the dataframe is: ",data.shape)
+data.info()
+
+print("The column names of the dataframe are: ",data.columns) 
+data.describe()
+
+data.isnull().sum() #prints the sum of null values
+
+encoder = ce.OrdinalEncoder(cols=['country']) # helps the data to tran
+data = encoder.fit_transform(data) 
+print(data)
+
+data['country']=data['country'].fillna(data['country'].mode()) #filling most probable value for country
+data = data.drop('sex',axis=1) 
+data= data.dropna(subset=['artist'])
+
+data.corr()
+data = data.drop('country',axis=1)
+
+columnsname = list(data["artist"].unique())
+username = list(data["user"].unique())
+
+newData=pd.DataFrame(columns=columnsname,index=username)
+newData.reset_index(inplace=True) 
+newData.head()
+
+transactions = []
+for i in data['user'].unique():
+    transactions.append(list(data[data['user'] == i]['artist'].values))
+
+x=len(columnsname)
+y=len(username)
+for i in range(y):
+    for j in range(x):
+        if columnsname[j] in transactions[i]:
+            newData.iloc[i,j]="True"
+        else:
+            newData.iloc[i,j]="False"
+
+print(newData)
+
+newData=newData.applymap(lambda x: True if x == "True" else False)
+
+frequent_items=apriori(newData,min_support=0.07,use_colnames=True)
+print("Total number of frequent items with support more than 0.07 is {}".format(len(frequent_items)))
+frequent_items
+
+rules=association_rules(frequent_items,metric="confidence",min_threshold=0.3)
+print(rules)
+
+rules.sort_values(by='lift',inplace=True,ascending=False)
+rules
+
+rules[ (rules['lift'] >= 6) & (rules['confidence'] >= 0.8) ].sort_values(['confidence','lift'],ascending=False)
